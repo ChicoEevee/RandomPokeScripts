@@ -11,6 +11,7 @@ class ColorEditorApp:
         self.current_file_path = None
         self.current_material_index = None
         self.current_param_index = None
+        self._updating_from_hex = False  # Prevent recursive updates
 
         # Left: Materials
         left_frame = tk.Frame(root)
@@ -30,7 +31,7 @@ class ColorEditorApp:
         self.param_listbox.pack(fill=tk.Y)
         self.param_listbox.bind("<<ListboxSelect>>", self.on_param_select)
 
-        # Right: RGBA
+        # Right: RGBA + Hex
         right_frame = tk.Frame(root)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
 
@@ -40,11 +41,13 @@ class ColorEditorApp:
         self.g_var = tk.StringVar()
         self.b_var = tk.StringVar()
         self.a_var = tk.StringVar()
+        self.hex_var = tk.StringVar()
 
         # Trigger preview update when RGB changes
         self.r_var.trace_add("write", lambda *args: self.update_color_preview())
         self.g_var.trace_add("write", lambda *args: self.update_color_preview())
         self.b_var.trace_add("write", lambda *args: self.update_color_preview())
+        self.hex_var.trace_add("write", lambda *args: self.on_hex_change())
 
         def make_labeled_entry(parent, label, var):
             row = tk.Frame(parent)
@@ -58,6 +61,13 @@ class ColorEditorApp:
         self.g_entry = make_labeled_entry(right_frame, "G:", self.g_var)
         self.b_entry = make_labeled_entry(right_frame, "B:", self.b_var)
         self.a_entry = make_labeled_entry(right_frame, "A:", self.a_var)
+
+        # Hex input
+        hex_row = tk.Frame(right_frame)
+        hex_row.pack(anchor="w", pady=5)
+        tk.Label(hex_row, text="Hex:", width=5).pack(side=tk.LEFT)
+        self.hex_entry = tk.Entry(hex_row, textvariable=self.hex_var, width=10)
+        self.hex_entry.pack(side=tk.LEFT)
 
         # Color Preview
         self.preview_canvas = tk.Canvas(right_frame, width=60, height=30, bg="#000000", highlightthickness=1, highlightbackground="black")
@@ -82,8 +92,11 @@ class ColorEditorApp:
             self.r_var.set(str(r))
             self.g_var.set(str(g))
             self.b_var.set(str(b))
+            self.hex_var.set(hex_color)
 
     def update_color_preview(self):
+        if self._updating_from_hex:
+            return
         try:
             r = float(self.r_var.get())
             g = float(self.g_var.get())
@@ -93,17 +106,38 @@ class ColorEditorApp:
             b = min(max(b, 0), 1)
             hex_color = "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
             self.preview_canvas.itemconfig(self.preview_rect, fill=hex_color)
+            self.hex_var.set(hex_color)
         except ValueError:
             pass  # Ignore invalid input
+
+    def on_hex_change(self):
+        hex_value = self.hex_var.get().strip()
+        if not hex_value.startswith("#") or len(hex_value) not in (4, 7):
+            return
+        try:
+            self._updating_from_hex = True
+            if len(hex_value) == 4:  # shorthand #RGB
+                hex_value = "#" + "".join([c * 2 for c in hex_value[1:]])
+            r = int(hex_value[1:3], 16) / 255.0
+            g = int(hex_value[3:5], 16) / 255.0
+            b = int(hex_value[5:7], 16) / 255.0
+            self.r_var.set(f"{r:.6f}")
+            self.g_var.set(f"{g:.6f}")
+            self.b_var.set(f"{b:.6f}")
+            self.preview_canvas.itemconfig(self.preview_rect, fill=hex_value)
+        except ValueError:
+            pass
+        finally:
+            self._updating_from_hex = False
 
     def load_json(self):
         path = filedialog.askopenfilename(filetypes=[("TRMTR files", "*.trmtr")])
         os.system(f'flatc --raw-binary --strict-json -o . -t trmtr.fbs --allow-non-utf8 -- "{path}"')
         if not path:
             return
-        with open(path.replace(".trmtr",".json"), 'r') as f:
+        with open(path.replace(".trmtr", ".json"), 'r') as f:
             self.data = json.load(f)
-        self.current_file_path = path.replace(".trmtr",".json")  # Save loaded file path
+        self.current_file_path = path.replace(".trmtr", ".json")  # Save loaded file path
         self.populate_materials()
 
     def populate_materials(self):
@@ -153,7 +187,7 @@ class ColorEditorApp:
         self.current_param_index = sel[0]
 
         param = self.data["materials"][self.current_material_index]["float4_parameter"][self.current_param_index]
-        rgba = param.get("color_value", {"r":0,"g":0,"b":0,"a":0})
+        rgba = param.get("color_value", {"r": 0, "g": 0, "b": 0, "a": 0})
 
         self.r_var.set(str(rgba.get("r", 0)))
         self.g_var.set(str(rgba.get("g", 0)))
@@ -165,6 +199,7 @@ class ColorEditorApp:
         self.g_var.set("")
         self.b_var.set("")
         self.a_var.set("")
+        self.hex_var.set("")
 
     def save_current_param_values(self):
         if (self.data is None or
@@ -184,7 +219,7 @@ class ColorEditorApp:
         param = self.data["materials"][self.current_material_index]["float4_parameter"][self.current_param_index]
         param["color_value"] = {"r": r, "g": g, "b": b, "a": a}
         return True
-        
+
     def save_json(self):
         # Save current edits first
         if not self.save_current_param_values():
@@ -206,6 +241,7 @@ class ColorEditorApp:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save JSON:\n{e}")
         os.system(f'flatc -b trmtr.fbs "{self.current_file_path}"')
+
 
 if __name__ == "__main__":
     root = tk.Tk()

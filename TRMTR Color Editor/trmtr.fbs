@@ -8,28 +8,48 @@ struct RGBA {
         b: float;
         a: float;
 }
+struct RGB {
+        r: float;
+        g: float;
+        b: float;
+}
+
+struct RG {
+        r: float;
+        g: float;
+}
 
 enum UVWrapMode: uint32 {
         //Time to test these as bit fields?
         WRAP = 0, //0000
         CLAMP = 1, //0001
+        UNK2 = 2, 
+        UNK3 = 3, 
+        UNK4 = 4, 
+        UNK5 = 5, 
         MIRROR = 6, //0110
         MIRROR_ONCE = 7, //0111
+        UNK8 = 8, 
+        UNK9 = 9, 
+        UNK10 = 10, 
+        UNK11 = 11, 
+        UNK12 = 12, 
+        UNK13 = 13, 
 }
 
 table SamplerState {
-        SamplerState_0: uint32 = 0x0; //Never used
-        SamplerState_1: uint32 = 0x0; //Never used
-        SamplerState_2: uint32 = 0x0; //Never used
-        SamplerState_3: uint32 = 0x0; //Never used
-        SamplerState_4: uint32 = 0x0; //Never used
-        SamplerState_5: uint32 = 0x0; //Never used
-        SamplerState_6: uint32 = 0x0; //Never used
-        SamplerState_7: uint32 = 0x0; //Never used
-        SamplerState_8: uint32 = 0x0; //Never used
-        repeat_u: UVWrapMode = WRAP; //0x1, 0x6 or 0x7
-        repeat_v: UVWrapMode = WRAP; //0x1, 0x6 or 0x7
-        repeat_w: UVWrapMode = WRAP; //Never used
+        SamplerState_0: uint;
+        SamplerState_1: uint;
+        SamplerState_2: uint;
+        SamplerState_3: uint;
+        SamplerState_4: uint;
+        SamplerState_5: uint;
+        SamplerState_6: uint;
+        SamplerState_7: uint;
+        SamplerState_8: uint;
+        repeat_u: UVWrapMode; //0x1, 0x6 or 0x7
+        repeat_v: UVWrapMode; //0x1, 0x6 or 0x7
+        repeat_w: UVWrapMode; //Never used
         border_color: RGBA;
 }
 
@@ -37,15 +57,34 @@ table Float4Parameter {
         color_name: string;
         color_value: RGBA; 
 }
+table Float3Parameter {
+        color_name: string;
+        color_value: RGB; 
+}
+table Float2Parameter {
+        color_name: string;
+        color_value: RG; 
+}
 
 table FloatParameter {
         float_name: string;
         float_value: float;
 }
-
+table IntParameter4 {
+        color_name: string;
+        color_value: RGBA; 
+}
+table IntParameter3 {
+        color_name: string;
+        color_value: RGB; 
+}
+table IntParameter2 {
+        color_name: string;
+        color_value: RG; 
+}
 table IntParameter {
         int_name: string;
-        int_value: int32 = -1;
+        int_value: int32;
 }
 
 table StringParameter {
@@ -61,19 +100,20 @@ table Shader {
 table Texture  {
         texture_name: string;
         texture_file: string;
-        texture_slot: uint32 = 0;
+        texture_slot: uint32;
 }
 
 table Byte_Extra {
-        //Only pm0448 has it as 0x0 in Transparent Shader
-        value: int8 = -1; 
+        value: bool; 
+        value2: bool; 
 }
 
 table Int_Extra {
         res_0: uint32;
-        //0 when Transparent
-        //1 when NonDirectional
-        value: int32 = -1;
+        value: int32;
+        value2: int;
+        value3: float;
+        value4: float;
 }
 
 table Material{
@@ -82,14 +122,14 @@ table Material{
         textures: [Texture];
         samplers: [SamplerState]; 
         float_parameter: [FloatParameter];
-        unk_5: string; //Always empty
-        float4_light_parameter: [Float4Parameter];
+        float2_parameter: [Float2Parameter]; //im not sure but it seems to be from 1 to 4
+        float3_parameter: [Float3Parameter]; //im not sure but it seems to be from 1 to 4
         float4_parameter: [Float4Parameter];
         unk_8: string; //Always empty
         int_parameter: [IntParameter];
-        unk_10: string; //Always empty
-        unk_11: string; //Always empty
-        unk_12: string; //Always empty
+        unk_10: [IntParameter2]; //im not sure but i expect to be the same as float
+        unk_11: [IntParameter3];
+        unk_12: [IntParameter4];
         byte_extra: Byte_Extra;
         int_extra: Int_Extra;
         alpha_type: string;
