@@ -145,7 +145,13 @@ class ColorEditorApp:
         if not self.data or "materials" not in self.data:
             return
 
-        for mat in self.data["materials"]:
+        # Sort materials by name, but keep original index
+        self.sorted_materials = sorted(
+            enumerate(self.data["materials"]),
+            key=lambda x: x[1].get("name", "").lower()
+        )
+
+        for _, mat in self.sorted_materials:
             self.material_listbox.insert(tk.END, mat.get("name", "<no name>"))
 
         self.current_material_index = None
@@ -163,12 +169,18 @@ class ColorEditorApp:
         sel = self.material_listbox.curselection()
         if not sel:
             return
-        self.current_material_index = sel[0]
+        sorted_index = sel[0]
+        self.current_material_index = self.sorted_materials[sorted_index][0]  
 
         material = self.data["materials"][self.current_material_index]
 
         self.param_listbox.delete(0, tk.END)
-        for param in material.get("float4_parameter", []):
+        params = material.get("float4_parameter", [])
+        self.sorted_params = sorted(
+            enumerate(params),
+            key=lambda x: x[1].get("color_name", "").lower()
+        )
+        for _, param in self.sorted_params:
             self.param_listbox.insert(tk.END, param.get("color_name", "<no name>"))
 
         self.current_param_index = None
@@ -184,7 +196,8 @@ class ColorEditorApp:
         sel = self.param_listbox.curselection()
         if not sel:
             return
-        self.current_param_index = sel[0]
+        sorted_param_index = sel[0]
+        self.current_param_index = self.sorted_params[sorted_param_index][0]
 
         param = self.data["materials"][self.current_material_index]["float4_parameter"][self.current_param_index]
         rgba = param.get("color_value", {"r": 0, "g": 0, "b": 0, "a": 0})
