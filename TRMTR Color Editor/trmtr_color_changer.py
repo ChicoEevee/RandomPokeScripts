@@ -111,7 +111,7 @@ class ColorEditorApp:
             pass  # Ignore invalid input
 
     def on_hex_change(self):
-        hex_value = self.hex_var.get().strip()
+        hex_value = self.hex_var.get().strip()[:7]
         if not hex_value.startswith("#") or len(hex_value) not in (4, 7):
             return
         try:
