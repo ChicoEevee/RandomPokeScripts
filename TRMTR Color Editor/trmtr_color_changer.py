@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, colorchooser
 import json, os, time
 
+
 class ColorEditorApp:
     def __init__(self, root):
         self.root = root
@@ -70,9 +71,14 @@ class ColorEditorApp:
         self.hex_entry.pack(side=tk.LEFT)
 
         # Color Preview
-        self.preview_canvas = tk.Canvas(right_frame, width=60, height=30, bg="#000000", highlightthickness=1, highlightbackground="black")
+        self.preview_canvas = tk.Canvas(
+            right_frame, width=60, height=30, bg="#000000",
+            highlightthickness=1, highlightbackground="black"
+        )
         self.preview_canvas.pack(pady=5)
-        self.preview_rect = self.preview_canvas.create_rectangle(0, 0, 60, 30, fill="#000000", outline="black")
+        self.preview_rect = self.preview_canvas.create_rectangle(
+            0, 0, 60, 30, fill="#000000", outline="black"
+        )
 
         # Color Picker Button
         color_btn = tk.Button(right_frame, text="Pick Color", command=self.pick_color)
@@ -84,6 +90,10 @@ class ColorEditorApp:
 
         tk.Button(btn_frame, text="Load TRMTR", command=self.load_json).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Save TRMTR", command=self.save_json).pack(side=tk.LEFT, padx=5)
+
+    # ------------------------
+    # Color Handling Functions
+    # ------------------------
 
     def pick_color(self):
         rgb, hex_color = colorchooser.askcolor()
@@ -101,12 +111,20 @@ class ColorEditorApp:
             r = float(self.r_var.get())
             g = float(self.g_var.get())
             b = float(self.b_var.get())
-            r = min(max(r, 0), 1)
-            g = min(max(g, 0), 1)
-            b = min(max(b, 0), 1)
-            hex_color = "#{:02x}{:02x}{:02x}".format(int(r * 255), int(g * 255), int(b * 255))
+
+            # Clamp only for preview display
+            r_disp = min(max(r, 0), 1)
+            g_disp = min(max(g, 0), 1)
+            b_disp = min(max(b, 0), 1)
+
+            hex_color = "#{:02x}{:02x}{:02x}".format(
+                int(r_disp * 255), int(g_disp * 255), int(b_disp * 255)
+            )
             self.preview_canvas.itemconfig(self.preview_rect, fill=hex_color)
-            self.hex_var.set(hex_color)
+
+            # Update hex only for valid visible range
+            if 0 <= r_disp <= 1 and 0 <= g_disp <= 1 and 0 <= b_disp <= 1:
+                self.hex_var.set(hex_color)
         except ValueError:
             pass  # Ignore invalid input
 
@@ -130,14 +148,21 @@ class ColorEditorApp:
         finally:
             self._updating_from_hex = False
 
+    # ------------------------
+    # File I/O and JSON Handling
+    # ------------------------
+
     def load_json(self):
         path = filedialog.askopenfilename(filetypes=[("TRMTR files", "*.trmtr")])
-        os.system(f'flatc --raw-binary --strict-json -o . -t trmtr.fbs --allow-non-utf8 -- "{path}"')
         if not path:
             return
-        with open(path.replace(".trmtr", ".json"), 'r') as f:
+        os.system(f'flatc --raw-binary --strict-json -o . -t trmtr.fbs --allow-non-utf8 -- "{path}"')
+
+        json_path = path.replace(".trmtr", ".json")
+        with open(json_path, 'r') as f:
             self.data = json.load(f)
-        self.current_file_path = path.replace(".trmtr", ".json")  # Save loaded file path
+
+        self.current_file_path = json_path
         self.populate_materials()
 
     def populate_materials(self):
@@ -145,7 +170,7 @@ class ColorEditorApp:
         if not self.data or "materials" not in self.data:
             return
 
-        # Sort materials by name, but keep original index
+        # Sort materials by name but keep original index
         self.sorted_materials = sorted(
             enumerate(self.data["materials"]),
             key=lambda x: x[1].get("name", "").lower()
@@ -170,7 +195,7 @@ class ColorEditorApp:
         if not sel:
             return
         sorted_index = sel[0]
-        self.current_material_index = self.sorted_materials[sorted_index][0]  
+        self.current_material_index = self.sorted_materials[sorted_index][0]
 
         material = self.data["materials"][self.current_material_index]
 
@@ -234,7 +259,6 @@ class ColorEditorApp:
         return True
 
     def save_json(self):
-        # Save current edits first
         if not self.save_current_param_values():
             return
 
@@ -249,10 +273,12 @@ class ColorEditorApp:
             with open(self.current_file_path, "w") as f:
                 json.dump(self.data, f, indent=1)
                 time.sleep(3)
-            
+
             messagebox.showinfo("Saved", f"JSON saved successfully:\n{os.path.basename(self.current_file_path)}")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save JSON:\n{e}")
+
+        # Rebuild TRMTR binary
         os.system(f'flatc -b trmtr.fbs "{self.current_file_path}"')
 
 
