@@ -14,7 +14,7 @@ class ColorEditorApp:
         self.current_param_index = None
         self._updating_from_hex = False  # Prevent recursive updates
 
-        # Left: Materials
+        # --- Left: Materials ---
         left_frame = tk.Frame(root)
         left_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
 
@@ -23,7 +23,7 @@ class ColorEditorApp:
         self.material_listbox.pack(fill=tk.Y)
         self.material_listbox.bind("<<ListboxSelect>>", self.on_material_select)
 
-        # Middle: Parameters
+        # --- Middle: Parameters ---
         middle_frame = tk.Frame(root)
         middle_frame.pack(side=tk.LEFT, fill=tk.Y, padx=5, pady=5)
 
@@ -32,7 +32,7 @@ class ColorEditorApp:
         self.param_listbox.pack(fill=tk.Y)
         self.param_listbox.bind("<<ListboxSelect>>", self.on_param_select)
 
-        # Right: RGBA + Hex
+        # --- Right: RGBA + Hex ---
         right_frame = tk.Frame(root)
         right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
 
@@ -44,7 +44,7 @@ class ColorEditorApp:
         self.a_var = tk.StringVar()
         self.hex_var = tk.StringVar()
 
-        # Trigger preview update when RGB changes
+        # Trace RGB changes for preview
         self.r_var.trace_add("write", lambda *args: self.update_color_preview())
         self.g_var.trace_add("write", lambda *args: self.update_color_preview())
         self.b_var.trace_add("write", lambda *args: self.update_color_preview())
@@ -91,9 +91,9 @@ class ColorEditorApp:
         tk.Button(btn_frame, text="Load TRMTR", command=self.load_json).pack(side=tk.LEFT, padx=5)
         tk.Button(btn_frame, text="Save TRMTR", command=self.save_json).pack(side=tk.LEFT, padx=5)
 
-    # ------------------------
+    # ----------------------------------------------------
     # Color Handling Functions
-    # ------------------------
+    # ----------------------------------------------------
 
     def pick_color(self):
         rgb, hex_color = colorchooser.askcolor()
@@ -105,6 +105,7 @@ class ColorEditorApp:
             self.hex_var.set(hex_color)
 
     def update_color_preview(self):
+        """Update preview color, but don't clamp saved values."""
         if self._updating_from_hex:
             return
         try:
@@ -122,35 +123,47 @@ class ColorEditorApp:
             )
             self.preview_canvas.itemconfig(self.preview_rect, fill=hex_color)
 
-            # Update hex only for valid visible range
-            if 0 <= r_disp <= 1 and 0 <= g_disp <= 1 and 0 <= b_disp <= 1:
-                self.hex_var.set(hex_color)
+            # Update hex only if values are in range (avoid clamping edits)
+            if 0 <= r <= 1 and 0 <= g <= 1 and 0 <= b <= 1:
+                if self.hex_var.get().lower() != hex_color:
+                    self._updating_from_hex = True
+                    self.hex_var.set(hex_color)
+                    self._updating_from_hex = False
+
         except ValueError:
             pass  # Ignore invalid input
 
     def on_hex_change(self):
-        hex_value = self.hex_var.get().strip()[:7]
-        if not hex_value.startswith("#") or len(hex_value) not in (4, 7):
+        """Convert hex -> RGB (only when manually changed)."""
+        if self._updating_from_hex:
+            return
+
+        hex_value = self.hex_var.get().strip()
+        if not hex_value or not hex_value.startswith("#") or len(hex_value) not in (4, 7):
             return
         try:
             self._updating_from_hex = True
             if len(hex_value) == 4:  # shorthand #RGB
                 hex_value = "#" + "".join([c * 2 for c in hex_value[1:]])
+
             r = int(hex_value[1:3], 16) / 255.0
             g = int(hex_value[3:5], 16) / 255.0
             b = int(hex_value[5:7], 16) / 255.0
+
+            # Only update if values are in visible range
             self.r_var.set(f"{r:.6f}")
             self.g_var.set(f"{g:.6f}")
             self.b_var.set(f"{b:.6f}")
+
             self.preview_canvas.itemconfig(self.preview_rect, fill=hex_value)
         except ValueError:
             pass
         finally:
             self._updating_from_hex = False
 
-    # ------------------------
+    # ----------------------------------------------------
     # File I/O and JSON Handling
-    # ------------------------
+    # ----------------------------------------------------
 
     def load_json(self):
         path = filedialog.askopenfilename(filetypes=[("TRMTR files", "*.trmtr")])
@@ -170,7 +183,6 @@ class ColorEditorApp:
         if not self.data or "materials" not in self.data:
             return
 
-        # Sort materials by name but keep original index
         self.sorted_materials = sorted(
             enumerate(self.data["materials"]),
             key=lambda x: x[1].get("name", "").lower()
@@ -198,8 +210,8 @@ class ColorEditorApp:
         self.current_material_index = self.sorted_materials[sorted_index][0]
 
         material = self.data["materials"][self.current_material_index]
-
         self.param_listbox.delete(0, tk.END)
+
         params = material.get("float4_parameter", [])
         self.sorted_params = sorted(
             enumerate(params),
